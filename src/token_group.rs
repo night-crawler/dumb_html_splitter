@@ -94,6 +94,12 @@ impl<'a> TokenGroup<'a> {
         }
     }
 
+    fn new_from_stack(stack: &[Token<'a>]) -> Self {
+        let mut tg = TokenGroup::default();
+        tg.open_from_stack(stack);
+        tg
+    }
+
     fn is_all_open(&self) -> bool {
         self.tokens.iter().all(Token::is_open)
     }
@@ -156,8 +162,7 @@ impl<'a> TokenGroup<'a> {
                         // recreate the token group
                         if tg.len + future_close_len >= max_chunk_size {
                             token_groups.push(tg);
-                            tg = TokenGroup::default();
-                            tg.open_from_stack(&stack);
+                            tg = Self::new_from_stack(&stack);
                         }
 
                         // rewind to the position right after the close token
@@ -176,8 +181,7 @@ impl<'a> TokenGroup<'a> {
                         tg.close_from_stack(&stack, &map);
                         token_groups.push(tg);
                         // we just need to clone the stack
-                        tg = TokenGroup::default();
-                        tg.open_from_stack(&stack);
+                        tg = Self::new_from_stack(&stack);
                     }
 
                     future_close_len += close_token_len;
@@ -218,8 +222,7 @@ impl<'a> TokenGroup<'a> {
                         if available_len == 0 {
                             tg.close_from_stack(&stack, &map);
                             token_groups.push(tg);
-                            tg = TokenGroup::default();
-                            tg.open_from_stack(&stack);
+                            tg = Self::new_from_stack(&stack);
                             available_len = max_chunk_size - future_close_len - tg.len;
                             if available_len == 0 {
                                 return Err(SplitError::SubdivisionImpossible(tg));
@@ -244,8 +247,7 @@ impl<'a> TokenGroup<'a> {
                         tg.close_from_stack(&stack, &map);
                         token_groups.push(tg);
 
-                        tg = TokenGroup::default();
-                        tg.open_from_stack(&stack);
+                        tg = Self::new_from_stack(&stack);
 
                         if text.is_empty() {
                             break;
@@ -271,7 +273,6 @@ impl<'a> TokenGroup<'a> {
         // A case when we have no_split tags exceeding the max_chunk_size limit
         for tg in &token_groups {
             if tg.len > max_chunk_size {
-                println!("{tg}");
                 return Err(SplitError::SubdividedExceedingTheLimit(token_groups));
             }
         }

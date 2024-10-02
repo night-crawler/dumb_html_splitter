@@ -20,10 +20,6 @@ impl<'a> Token<'a> {
         }
     }
 
-    pub(crate) fn matches_tag_name(&self, tag: &str) -> bool {
-        self.tag_name() == tag
-    }
-
     pub(crate) fn len_since(&self, start: &Self) -> usize {
         self.index() + self.len() - start.index()
     }
@@ -40,10 +36,6 @@ impl<'a> Token<'a> {
                 .unwrap(),
             _ => "",
         }
-    }
-
-    pub(crate) fn is_close(&self) -> bool {
-        matches!(self, Token::CloseTag(_, _))
     }
 
     pub(crate) fn is_open(&self) -> bool {
@@ -64,24 +56,6 @@ impl<'a> Token<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_is_close_true() {
-        let token = Token::CloseTag("</div>", 0);
-        assert!(token.is_close());
-    }
-
-    #[test]
-    fn test_is_close_false() {
-        let token = Token::OpenTag("<div>", 0);
-        assert!(!token.is_close());
-    }
-
-    #[test]
-    fn test_is_close_self_closing() {
-        let token = Token::OpenTag("<br/>", 0);
-        assert!(!token.is_close()); // May need to adjust implementation
-    }
 
     #[test]
     fn test_tag_name_simple_open() {
@@ -118,30 +92,6 @@ mod tests {
     fn test_tag_name_malformed_tag() {
         let token = Token::OpenTag("<div", 0);
         assert_eq!(token.tag_name(), "div");
-    }
-
-    #[test]
-    fn test_matches_tag_name_true() {
-        let token = Token::OpenTag("<div>", 0);
-        assert!(token.matches_tag_name("div"));
-    }
-
-    #[test]
-    fn test_matches_tag_name_false() {
-        let token = Token::OpenTag("<span>", 0);
-        assert!(!token.matches_tag_name("div"));
-    }
-
-    #[test]
-    fn test_matches_tag_name_self_closing() {
-        let token = Token::OpenTag("<br/>", 0);
-        assert!(token.matches_tag_name("br/"));
-    }
-
-    #[test]
-    fn test_matches_tag_name_with_attributes() {
-        let token = Token::OpenTag("<div class='main'>", 0);
-        assert!(token.matches_tag_name("div"));
     }
 
     #[test]
