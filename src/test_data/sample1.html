@@ -1,0 +1,79 @@
+<pre><code class="language-rust">use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::hint::unreachable_unchecked;
+
+/// https://leetcode.com/problems/meeting-rooms-iii/
+pub struct Solution;
+
+impl Solution {
+    pub fn most_booked(num_rooms: i32, mut meetings: Vec&lt;Vec&lt;i32&gt;&gt;) -&gt; i32 {
+        // Internally work with usize for room indices and timestamps for better consistency with other usages
+        let num_rooms = num_rooms as usize;
+        
+        // Sort meetings by starting time to process them in chronological order;
+        // this ensures we&#39;re always assigning rooms in the correct sequence.
+        meetings.sort_unstable_by_key(|meeting| (meeting[0]));
+
+        // `end_timestamps` holds (end_time, room_index) as Reverse to simulate a min-heap.
+        // This BinaryHeap tracks when rooms become available again based on their next available time.
+        let mut end_timestamps = BinaryHeap::&lt;Reverse&lt;(usize, usize)&gt;&gt;::with_capacity(num_rooms);
+
+        // `counter` tracks the booking frequency for each room.
+        let mut counter = vec![0; num_rooms];
+
+        // `vacant_rooms` initially contains all room indices (as Reverse) and represents
+        // the pool of currently available rooms in the form of a min-heap. We use Reverse here
+        // to maintain the priority of &quot;minimal room index&quot; for tie-breaking when multiple rooms are free.
+        let mut vacant_rooms = BinaryHeap::from_iter((0..num_rooms).map(Reverse));
+
+        for (start, end) in meetings.into_iter().map(|meeting| (meeting[0] as usize, meeting[1] as usize)) {
+            // Free up any rooms where meetings have already ended before the current meeting&#39;s start.
+            // We move rooms from `end_timestamps` to `vacant_rooms` if they&#39;re no longer in use.
+            while !end_timestamps.is_empty() &amp;&amp; end_timestamps.peek().map(|Reverse((ts, _))| ts) &lt;= Some(&amp;start) {
+                let Reverse((_, room)) = end_timestamps.pop().unwrap();
+                vacant_rooms.push(Reverse(room)); // Room becomes vacant, push it back into the pool for new assignment.
+            }
+
+            // If we have vacant rooms available, assign the first one by popping from the heap.
+            // Otherwise, we need to book the room with the earliest finish time and extend when it will next be free.
+            let (end, room) = if let Some(Reverse(room)) = vacant_rooms.pop() {
+                // If a room is free, assign it and keep the original meeting duration.
+                (end, room)
+            } else if let Some(Reverse((nearest_end, room))) = end_timestamps.pop() {
+                // No room is currently available, so extend the earliest available room’s next availability
+                // such that it is booked again after its currently running meeting.
+                (nearest_end + end - start, room)
+            } else {
+                // This branch should theoretically be unreachable because of the problem guarantees (inputs ensure we either have free rooms
+                // or can wait for a room to finish a meeting). Hence, we use `unreachable_unchecked()`, which is an unsafe hint for the compiler.
+                unsafe { unreachable_unchecked() }
+            };
+
+            // Once a room is booked (either free or extended), update its availability on the `end_timestamps` heap.
+            end_timestamps.push(Reverse((end, room)));
+
+            // Increment the booking count for this specific room as it has been successfully used for one more meeting.
+            counter[room] += 1;
+        }
+
+        // After all meetings are processed, find the room that was booked the most.
+        // If multiple rooms have the same booking count, we pick the smallest index (implicit due to the way the loop works).
+        let (mut max_index, mut max) = (0, 0);
+        for (index, count) in counter.into_iter().enumerate() {
+            if count &gt; max {
+                max = count;
+                max_index = index; // Update the index to the new most frequently booked room.
+            }
+        }
+
+        // Return the room index with the maximum bookings.
+        max_index as i32
+    }
+}</code></pre>
+
+<b><i><u>High-Level Design Insights:</u></i></b>
+
+1.  <b>Efficient Room Assignment</b>: The use of two priority queues (<code>vacant_rooms</code> and <code>end_timestamps</code>) ensures that assigning rooms and releasing rooms is done in logarithmic time. This guarantees that each room assignment and availability update operates efficiently while preserving the priority of earlier-finished rooms.
+2.  <b>Controlling Room Load</b>: <code>BinaryHeap</code> operations ensure that the solution optimizes the assignment by always preferring rooms that either finish next or are numerically smallest, which is essential both for minimizing room idle time and ensuring that ties are broken by room index.
+3.  <b>Synchronization Between Events</b>: The while-loop releasing rooms prior to every new meeting safeguards against booking conflicts—this ensures that rooms that have finished their meetings by the current meeting&#39;s start are available to be reassigned.
+4.  <b>Use of <code>unreachable_unchecked</code> as a Fallback</b>: The use of this unsafe hint significantly improves runtime performance by signaling to the compiler that no fallback logic is required here, as the problem constraints guarantee the existence of valid rooms/future availability.

@@ -42,6 +42,10 @@ impl<'a> Token<'a> {
         matches!(self, Token::OpenTag(_, _))
     }
 
+    pub(crate) fn is_close(&self) -> bool {
+        matches!(self, Token::CloseTag(_, _))
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.as_text().len()
     }

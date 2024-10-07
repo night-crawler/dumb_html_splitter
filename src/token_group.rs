@@ -15,18 +15,23 @@ pub struct TokenGroup<'a> {
 /// Root-level group of tokens
 impl<'a> TokenGroup<'a> {
     pub(crate) fn push(&mut self, token: Token<'a>) {
-        self.tokens.push(token);
-        match token {
-            Token::OpenTag(_, _) => {
-                self.len += token.len();
-            }
-            Token::CloseTag(_, _) => {
-                self.len += token.len();
-            }
-            Token::Text(_, _) => {
-                self.len += token.len();
-            }
+        debug_assert!(token.len() != 0, "{token:?} has invalid length");
+
+        let is_empty_tag =
+            token.is_close() && self.tokens.last().map_or(false, |last| last.is_open());
+        if is_empty_tag {
+            self.pop();
+            return;
         }
+
+        self.tokens.push(token);
+        self.len += token.len();
+    }
+
+    pub(crate) fn pop(&mut self) -> Option<Token<'a>> {
+        let token = self.tokens.pop()?;
+        self.len -= token.len();
+        Some(token)
     }
 
     fn prepare_open_close_map(&self) -> Result<HashMap<Token<'a>, Token<'a>>, SplitError<'a>> {
@@ -244,9 +249,9 @@ impl<'a> TokenGroup<'a> {
                         text = &text[can_fit_segment.len()..];
                         text_start_index += can_fit_segment.len();
 
+                        debug_assert!(!tg.is_all_open());
                         tg.close_from_stack(&stack, &map);
                         token_groups.push(tg);
-
                         tg = Self::new_from_stack(&stack);
 
                         if text.is_empty() {
@@ -266,7 +271,7 @@ impl<'a> TokenGroup<'a> {
         debug_assert!(tg.len <= max_chunk_size);
         debug_assert_eq!(future_close_len, 0);
 
-        if !tg.tokens.is_empty() {
+        if !tg.tokens.is_empty() && !tg.is_all_open() {
             token_groups.push(tg);
         }
 
@@ -414,6 +419,18 @@ mod tests {
             result
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_sample1() -> TestResult {
+        let html = include_str!("./test_data/sample1.html");
+        let tgs = TokenGroup::from_string(html).subdivide(4000, &["a"])?;
+        for tg in tgs {
+            assert!(
+                !(format!("{tg}").contains(r#"<pre><code class="language-rust"></code></pre>"#))
+            )
+        }
         Ok(())
     }
 }
